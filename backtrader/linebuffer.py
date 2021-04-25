@@ -46,7 +46,8 @@ from .utils import num2date, time2num
 
 NAN = float('NaN')
 
-
+# LineBuffer的继承链
+# LineBuffer -> LineSingle -> LineRoot -> MetaLineRoot(元类) -> MetaParams(元类)
 class LineBuffer(LineSingle):
     '''
     LineBuffer defines an interface to an "array.array" (or list) in which
@@ -102,6 +103,8 @@ class LineBuffer(LineSingle):
     def reset(self):
         ''' Resets the internal buffer structure and the indices
         '''
+        # 如果在qbuffer模式下, k线存储就是一个双边队列deque, 队列长度是
+        # 如果在unbounded模式下, k线存储就是一个数组array
         if self.mode == self.QBuffer:
             # add extrasize to ensure resample/replay work because they will
             # use backwards to erase the last bar/tick before delivering a new

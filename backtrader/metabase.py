@@ -63,7 +63,9 @@ def findowner(owned, cls, startlevel=2, skip=None):
     return None
 
 
+# 在本想中广泛运用的基类, 是一个元类
 class MetaBase(type):
+    # 下面五个函数是hook, 留给子类去定义, 来控制类创建的过程
     def doprenew(cls, *args, **kwargs):
         return cls, args, kwargs
 
@@ -81,6 +83,7 @@ class MetaBase(type):
     def dopostinit(cls, _obj, *args, **kwargs):
         return _obj, args, kwargs
 
+    # 定义回调函数__call__去控制类的实例的创建
     def __call__(cls, *args, **kwargs):
         cls, args, kwargs = cls.doprenew(*args, **kwargs)
         _obj, args, kwargs = cls.donew(*args, **kwargs)
@@ -90,16 +93,21 @@ class MetaBase(type):
         return _obj
 
 
+# 本项目中常用的params变量的底层结构
 class AutoInfoClass(object):
     _getpairsbase = classmethod(lambda cls: OrderedDict())
+    # 内置的ordereddict
     _getpairs = classmethod(lambda cls: OrderedDict())
     _getrecurse = classmethod(lambda cls: False)
 
     @classmethod
     def _derive(cls, name, info, otherbases, recurse=False):
+        # 通过这个函数, 可以根据提供的param数据构造一个新的AutoInfoClass类
         # collect the 3 set of infos
         # info = OrderedDict(info)
+        # 该类原来存储的数据
         baseinfo = cls._getpairs().copy()
+        # 父类中提供的params数据, 通过遍历去写入这个OrderedDict
         obasesinfo = OrderedDict()
         for obase in otherbases:
             if isinstance(obase, (tuple, dict)):
@@ -108,16 +116,24 @@ class AutoInfoClass(object):
                 obasesinfo.update(obase._getpairs())
 
         # update the info of this class (base) with that from the other bases
+        # 把父类数据更新到现在的数据中
         baseinfo.update(obasesinfo)
 
         # The info of the new class is a copy of the full base info
         # plus and update from parameter
         clsinfo = baseinfo.copy()
+        # 把现在提供的params数据存储到clsinfo中
         clsinfo.update(info)
 
         # The new items to update/set are those from the otherbase plus the new
+        # 不包含父类params数据, 仅包含现在提供的params数据
         info2add = obasesinfo.copy()
         info2add.update(info)
+
+        # 总结一下:
+        # baseinfo: 原本数据+父类数据
+        # clsinfo:  原本数据+父类数据+新数据
+        # info2add: 父类数据+新数据
 
         clsmodule = sys.modules[cls.__module__]
         newclsname = str(cls.__name__ + '_' + name)  # str - Python 2/3 compat
@@ -200,10 +216,13 @@ class AutoInfoClass(object):
         return obj
 
 
+# 本项目广泛运用的元类, 继承了MetaBase.
+# 通过重新定义__new__去控制类的创建, 然后通过重新定义父类的hook函数donew去控制创建类的实例
 class MetaParams(MetaBase):
     def __new__(meta, name, bases, dct):
         # Remove params from class definition to avoid inheritance
         # (and hence "repetition")
+        # 获取类中params数据
         newparams = dct.pop('params', ())
 
         packs = 'packages'
@@ -236,10 +255,12 @@ class MetaParams(MetaBase):
         cls.frompackages = fpackages + fnewpackages
 
         # Subclass and store the newly derived params class
+        # 基于现有的params数据和父类的params数据, 构造一个全新的AutoInfoClass类
         cls.params = params._derive(name, newparams, morebasesparams)
 
         return cls
 
+    # 控制类的实例化
     def donew(cls, *args, **kwargs):
         clsmod = sys.modules[cls.__module__]
         # import specified packages
@@ -280,12 +301,15 @@ class MetaParams(MetaBase):
                     setattr(sys.modules[basecls.__module__], falias, pattr)
 
         # Create params and set the values from the kwargs
+        # 把从__new__函数中创建的params类(AutoInfoClass)实例化,
+        # 并把AutoInfoClass中存储的dict里面的KV转换成属性存储
         params = cls.params()
         for pname, pdef in cls.params._getitems():
             setattr(params, pname, kwargs.pop(pname, pdef))
 
         # Create the object and set the params in place
         _obj, args, kwargs = super(MetaParams, cls).donew(*args, **kwargs)
+        # 这样就可以直接调用params的数据了, 比如cerebro类中的self.maxcpus
         _obj.params = params
         _obj.p = params  # shorter alias
 

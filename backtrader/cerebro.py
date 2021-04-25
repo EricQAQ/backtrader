@@ -52,6 +52,10 @@ class OptReturn(object):
             setattr(self, k, v)
 
 
+# backtrader的核心模块: 调度中心
+# 1. 它(cerebro)从data feeds获取行情数据
+# 2. 通过给broker提供实例, 使得broker完成下单以及持仓功能
+# 3. 组装策略实例
 class Cerebro(with_metaclass(MetaParams, object)):
     '''Params:
 
@@ -1022,6 +1026,8 @@ class Cerebro(with_metaclass(MetaParams, object)):
         threads the execution will stop as soon as possible.'''
         self._event_stop = True  # signal a stop has been requested
 
+    # cerebro的核心方法, 用来启动
+    # 所需参数可以用来更新params提供的参数值
     def run(self, **kwargs):
         '''The core method to perform backtesting. Any ``kwargs`` passed to it
         will affect the value of the standard parameters ``Cerebro`` was
